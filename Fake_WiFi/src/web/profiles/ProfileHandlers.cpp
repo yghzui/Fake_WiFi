@@ -22,19 +22,21 @@ void handleStatus() {
   html += "<a class='btn btn-secondary' href='/resources'>资源监控</a>";
   html += "<a class='btn btn-muted' href='/status'>刷新</a></div>";
 
-  html += "<h3>当前生效配置</h3>";
-  html += "<div class='row-card'>";
-  html += "<div class='kv'>组名：" + htmlEscape(profiles[activeProfile].name) + "</div>";
-  html += "<div class='kv'>SSID：" + htmlEscape(ssid) + "</div>";
-  html += "<div class='kv'>信道：" + String(channel) + "</div>";
-  html += "<div class='kv'>BSSID：" + htmlEscape(macDisplay()) + "</div>";
-  html += "</div>";
-
   html += "<h3>配置组列表</h3>";
+  int displayIndices[profileCount];
+  displayIndices[0] = activeProfile;
+  int idx = 1;
   for (int i = 0; i < profileCount; ++i) {
+    if (i != activeProfile) {
+      displayIndices[idx++] = i;
+    }
+  }
+
+  for (int j = 0; j < profileCount; ++j) {
+    int i = displayIndices[j];
     html += "<div class='row-card'>";
-    html += "<div class='kv'>#" + String(i) + " 组名：" + htmlEscape(profiles[i].name);
-    if (i == activeProfile) html += "（当前）";
+    html += "<div class='kv'>#" + String(j) + " 组名：" + htmlEscape(profiles[i].name);
+    if (j == 0) html += "（当前）";
     html += "</div>";
     html += "<div class='kv'>SSID：" + htmlEscape(profiles[i].ssid) + "</div>";
     html += "<div class='kv'>信道：" + String(clampChannel(profiles[i].channel)) + "</div>";
@@ -42,14 +44,14 @@ void handleStatus() {
     html += "<div class='actions'>";
     html += "<a class='btn btn-muted' href='/edit?idx=" + String(i) + "'>修改</a>";
 
-    if (i != activeProfile) {
+    if (j > 0) {
       html += "<form class='inline-form' action='/profile/switch' method='POST'>";
       html += "<input type='hidden' name='idx' value='" + String(i) + "'>";
       html += "<button class='btn btn-success' type='submit'>切换并重启</button>";
       html += "</form>";
     }
 
-    if (profileCount > 1 && i != activeProfile) {
+    if (profileCount > 1 && j > 0) {
       html += "<form class='inline-form' action='/profile/delete' method='POST' onsubmit=\"return confirm('确认删除该配置组？');\">";
       html += "<input type='hidden' name='idx' value='" + String(i) + "'>";
       html += "<button class='btn btn-danger' type='submit'>删除</button>";

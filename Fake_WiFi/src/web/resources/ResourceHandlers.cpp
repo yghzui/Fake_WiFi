@@ -58,7 +58,7 @@ void handleResources() {
   html += baseStyles();
   html += "</head><body><div class='container'>";
   html += "<h2>当前资源使用情况</h2>";
-  html += "<div class='toolbar'><a class='btn btn-muted' href='/status'>返回配置页</a><a class='btn btn-primary' href='/resources'>刷新</a><a class='btn btn-secondary' href='/resources/export'>导出信息(JSON)</a></div>";
+  html += "<div class='toolbar'><a class='btn btn-muted' href='/status'>返回配置页</a><a class='btn btn-primary' href='/resources'>刷新</a><a class='btn btn-secondary' href='#' onclick='copyResourceSnapshot();return false;'>导出信息(JSON)</a></div>";
   html += "<div class='row-card'><h3>运行信息</h3>";
   html += "<div class='kv'>运行时长：" + formatUptime() + "</div>";
   html += "<div class='kv'>SDK 版本：" + String(ESP.getSdkVersion()) + "</div>";
@@ -84,6 +84,29 @@ void handleResources() {
   html += "<div class='kv'>Flash 频率：" + String(flashSpeed / 1000000UL) + " MHz</div></div>";
 
   html += "<div class='note'>提示：该页面为实时快照，点击刷新可查看最新资源状态。</div>";
+  html += "<script>";
+  html += "async function copyResourceSnapshot(){";
+  html += "try{";
+  html += "const resp=await fetch('/resources/export');";
+  html += "if(!resp.ok){throw new Error('HTTP '+resp.status);}";
+  html += "const text=await resp.text();";
+  html += "if(navigator.clipboard&&window.isSecureContext){";
+  html += "await navigator.clipboard.writeText(text);";
+  html += "alert('资源快照 JSON 已复制到剪贴板');";
+  html += "}else{";
+  html += "const ta=document.createElement('textarea');";
+  html += "ta.value=text;";
+  html += "document.body.appendChild(ta);";
+  html += "ta.select();";
+  html += "document.execCommand('copy');";
+  html += "document.body.removeChild(ta);";
+  html += "alert('资源快照 JSON 已复制到剪贴板');";
+  html += "}";
+  html += "}catch(e){";
+  html += "alert('复制失败：'+e);";
+  html += "}";
+  html += "}";
+  html += "</script>";
   html += "</div></body></html>";
   server.send(200, "text/html; charset=UTF-8", html);
 }
@@ -92,6 +115,5 @@ void handleResourcesExport() {
   if (!ensureAuth()) return;
 
   String json = buildResourceSnapshotJson();
-  server.sendHeader("Content-Disposition", "attachment; filename=resource_snapshot.json");
   server.send(200, "application/json; charset=UTF-8", json);
 }
