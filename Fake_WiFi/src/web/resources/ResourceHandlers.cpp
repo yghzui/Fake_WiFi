@@ -1,0 +1,97 @@
+#include "ResourceHandlers.h"
+
+#include <WiFi.h>
+
+#include "../../common/AppState.h"
+#include "../auth/Auth.h"
+#include "../shared/WebUiUtils.h"
+
+static String buildResourceSnapshotJson() {
+  uint32_t freeHeap = ESP.getFreeHeap();
+  uint32_t minFreeHeap = ESP.getMinFreeHeap();
+  uint32_t maxAllocHeap = ESP.getMaxAllocHeap();
+  uint32_t freePsram = ESP.getFreePsram();
+  uint32_t psramSize = ESP.getPsramSize();
+  uint32_t sketchSize = ESP.getSketchSize();
+  uint32_t freeSketch = ESP.getFreeSketchSpace();
+  uint32_t flashSize = ESP.getFlashChipSize();
+  uint32_t flashSpeed = ESP.getFlashChipSpeed();
+  uint8_t stationCount = WiFi.softAPgetStationNum();
+
+  String json = "{";
+  json += "\"uptime\":\"" + formatUptime() + "\",";
+  json += "\"sdkVersion\":\"" + String(ESP.getSdkVersion()) + "\",";
+  json += "\"chipRevision\":" + String(ESP.getChipRevision()) + ",";
+  json += "\"stations\":" + String(stationCount) + ",";
+  json += "\"heap\":{";
+  json += "\"free\":" + String(freeHeap) + ",";
+  json += "\"minFree\":" + String(minFreeHeap) + ",";
+  json += "\"maxAlloc\":" + String(maxAllocHeap) + "},";
+  json += "\"psram\":{";
+  json += "\"size\":" + String(psramSize) + ",";
+  json += "\"free\":" + String(freePsram) + "},";
+  json += "\"flash\":{";
+  json += "\"size\":" + String(flashSize) + ",";
+  json += "\"speed\":" + String(flashSpeed) + "},";
+  json += "\"sketch\":{";
+  json += "\"size\":" + String(sketchSize) + ",";
+  json += "\"free\":" + String(freeSketch) + "}";
+  json += "}";
+  return json;
+}
+
+void handleResources() {
+  if (!ensureAuth()) return;
+
+  uint32_t freeHeap = ESP.getFreeHeap();
+  uint32_t minFreeHeap = ESP.getMinFreeHeap();
+  uint32_t maxAllocHeap = ESP.getMaxAllocHeap();
+  uint32_t freePsram = ESP.getFreePsram();
+  uint32_t psramSize = ESP.getPsramSize();
+  uint32_t sketchSize = ESP.getSketchSize();
+  uint32_t freeSketch = ESP.getFreeSketchSpace();
+  uint32_t flashSize = ESP.getFlashChipSize();
+  uint32_t flashSpeed = ESP.getFlashChipSpeed();
+  uint8_t stationCount = WiFi.softAPgetStationNum();
+
+  String html = "<!DOCTYPE html><html lang='zh-CN'><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width,initial-scale=1.0'><title>资源监控</title>";
+  html += baseStyles();
+  html += "</head><body><div class='container'>";
+  html += "<h2>当前资源使用情况</h2>";
+  html += "<div class='toolbar'><a class='btn btn-muted' href='/status'>返回配置页</a><a class='btn btn-primary' href='/resources'>刷新</a><a class='btn btn-secondary' href='/resources/export'>导出信息(JSON)</a></div>";
+  html += "<div class='row-card'><h3>运行信息</h3>";
+  html += "<div class='kv'>运行时长：" + formatUptime() + "</div>";
+  html += "<div class='kv'>SDK 版本：" + String(ESP.getSdkVersion()) + "</div>";
+  html += "<div class='kv'>芯片修订版本：" + String(ESP.getChipRevision()) + "</div>";
+  html += "<div class='kv'>当前连接设备数：" + String(stationCount) + "</div></div>";
+
+  html += "<div class='row-card'><h3>内存信息</h3>";
+  html += "<div class='kv'>可用 Heap：" + formatBytes(freeHeap) + "</div>";
+  html += "<div class='kv'>最小剩余 Heap：" + formatBytes(minFreeHeap) + "</div>";
+  html += "<div class='kv'>最大连续可分配 Heap：" + formatBytes(maxAllocHeap) + "</div>";
+  if (psramSize > 0) {
+    html += "<div class='kv'>PSRAM 总量：" + formatBytes(psramSize) + "</div>";
+    html += "<div class='kv'>可用 PSRAM：" + formatBytes(freePsram) + "</div>";
+  } else {
+    html += "<div class='kv'>PSRAM：未启用或硬件不支持</div>";
+  }
+  html += "</div>";
+
+  html += "<div class='row-card'><h3>程序与 Flash</h3>";
+  html += "<div class='kv'>程序已占用：" + formatBytes(sketchSize) + "</div>";
+  html += "<div class='kv'>可用程序空间：" + formatBytes(freeSketch) + "</div>";
+  html += "<div class='kv'>Flash 总量：" + formatBytes(flashSize) + "</div>";
+  html += "<div class='kv'>Flash 频率：" + String(flashSpeed / 1000000UL) + " MHz</div></div>";
+
+  html += "<div class='note'>提示：该页面为实时快照，点击刷新可查看最新资源状态。</div>";
+  html += "</div></body></html>";
+  server.send(200, "text/html; charset=UTF-8", html);
+}
+
+void handleResourcesExport() {
+  if (!ensureAuth()) return;
+
+  String json = buildResourceSnapshotJson();
+  server.sendHeader("Content-Disposition", "attachment; filename=resource_snapshot.json");
+  server.send(200, "application/json; charset=UTF-8", json);
+}

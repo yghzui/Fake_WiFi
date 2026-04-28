@@ -1,0 +1,83 @@
+#include "ProfileStore.h"
+
+#include "../common/AppState.h"
+
+int clampChannel(int ch) {
+  if (ch < 1) return 1;
+  if (ch > 13) return 13;
+  return ch;
+}
+
+bool validBssid(const String& macText) {
+  if (macText.length() == 0) return true;
+  if (macText.length() != 17) return false;
+  int values[6];
+  return (6 == sscanf(macText.c_str(), "%x:%x:%x:%x:%x:%x",
+                      &values[0], &values[1], &values[2], &values[3], &values[4], &values[5]));
+}
+
+static String keyFor(int index, const char* suffix) {
+  return "p" + String(index) + "_" + suffix;
+}
+
+static void removeProfileKeys(int index) {
+  preferences.remove(keyFor(index, "name").c_str());
+  preferences.remove(keyFor(index, "ssid").c_str());
+  preferences.remove(keyFor(index, "password").c_str());
+  preferences.remove(keyFor(index, "channel").c_str());
+  preferences.remove(keyFor(index, "bssid").c_str());
+}
+
+void saveProfilesToPreferences() {
+  preferences.putInt("profile_count", profileCount);
+  preferences.putInt("active_profile", activeProfile);
+
+  for (int i = 0; i < profileCount; ++i) {
+    preferences.putString(keyFor(i, "name").c_str(), profiles[i].name);
+    preferences.putString(keyFor(i, "ssid").c_str(), profiles[i].ssid);
+    preferences.putString(keyFor(i, "password").c_str(), profiles[i].password);
+    preferences.putInt(keyFor(i, "channel").c_str(), clampChannel(profiles[i].channel));
+    preferences.putString(keyFor(i, "bssid").c_str(), profiles[i].bssid);
+  }
+
+  for (int i = profileCount; i < MAX_PROFILES; ++i) {
+    removeProfileKeys(i);
+  }
+}
+
+void applyProfileToRuntime() {
+  if (activeProfile < 0 || activeProfile >= profileCount) activeProfile = 0;
+  ssid = profiles[activeProfile].ssid;
+  password = profiles[activeProfile].password;
+  channel = clampChannel(profiles[activeProfile].channel);
+  bssid_str = profiles[activeProfile].bssid;
+}
+
+void loadProfilesFromPreferences() {
+  profileCount = preferences.getInt("profile_count", 0);
+  if (profileCount < 0 || profileCount > MAX_PROFILES) profileCount = 0;
+
+  if (profileCount == 0) {
+    // 兼容旧版本：读取单组配置，迁移为第 0 组
+    profiles[0].name = "默认组";
+    profiles[0].ssid = preferences.getString("ssid", "Fake_WiFi_Setup");
+    profiles[0].password = preferences.getString("password", "");
+    profiles[0].channel = clampChannel(preferences.getInt("channel", 1));
+    profiles[0].bssid = preferences.getString("bssid", "");
+    profileCount = 1;
+    activeProfile = 0;
+    saveProfilesToPreferences();
+  } else {
+    for (int i = 0; i < profileCount; ++i) {
+      profiles[i].name = preferences.getString(keyFor(i, "name").c_str(), "配置组" + String(i + 1));
+      profiles[i].ssid = preferences.getString(keyFor(i, "ssid").c_str(), "Fake_WiFi_Setup");
+      profiles[i].password = preferences.getString(keyFor(i, "password").c_str(), "");
+      profiles[i].channel = clampChannel(preferences.getInt(keyFor(i, "channel").c_str(), 1));
+      profiles[i].bssid = preferences.getString(keyFor(i, "bssid").c_str(), "");
+    }
+    activeProfile = preferences.getInt("active_profile", 0);
+    if (activeProfile < 0 || activeProfile >= profileCount) activeProfile = 0;
+  }
+
+  applyProfileToRuntime();
+}
