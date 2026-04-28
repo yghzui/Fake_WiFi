@@ -38,12 +38,12 @@ void handleStatus() {
   String html = "<!DOCTYPE html><html lang='zh-CN'><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width,initial-scale=1.0'><title>Wi-Fi 配置组管理</title>";
   html += baseStyles();
   html += "</head><body><div class='container'>";
-  html += "<h2>Wi-Fi 配置组管理</h2>";
+  html += "<h2 class='page-title'>Wi-Fi 配置组管理</h2>";
   html += "<div class='toolbar'><a class='btn btn-primary' href='/edit'>新增配置组</a>";
   html += "<a class='btn btn-secondary' href='/resources'>资源监控</a>";
   html += "<a class='btn btn-muted' href='/status'>刷新</a></div>";
 
-  html += "<h3>配置组列表</h3>";
+  html += "<h3 class='section-title'>配置组列表</h3>";
   int displayIndices[profileCount];
   displayIndices[0] = activeProfile;
   int idx = 1;
@@ -56,17 +56,19 @@ void handleStatus() {
   for (int j = 0; j < profileCount; ++j) {
     int i = displayIndices[j];
     html += "<div class='row-card'>";
-    html += "<div class='kv'>#" + String(j) + " 组名：" + htmlEscape(profiles[i].name);
-    if (j == 0) html += "（当前）";
+    html += "<div class='card-title'>#" + String(j) + " " + htmlEscape(profiles[i].name);
+    if (j == 0) html += "<span class='badge'>当前生效</span>";
     html += "</div>";
-    html += "<div class='kv'>模式：" + modeLabel(profiles[i].mode) + "</div>";
-    html += "<div class='kv'>SSID：" + htmlEscape(profiles[i].ssid) + "</div>";
-    html += "<div class='kv'>信道：" + String(clampChannel(profiles[i].channel)) + "</div>";
-    html += "<div class='kv'>BSSID：" + htmlEscape(profiles[i].bssid.length() == 0 ? "默认" : profiles[i].bssid) + "</div>";
+    html += "<div class='kv-grid'>";
+    html += "<div class='kv-item'><span class='kv-label'>模式：</span>" + modeLabel(profiles[i].mode) + "</div>";
+    html += "<div class='kv-item'><span class='kv-label'>SSID：</span>" + htmlEscape(profiles[i].ssid) + "</div>";
+    html += "<div class='kv-item'><span class='kv-label'>信道：</span>" + String(clampChannel(profiles[i].channel)) + "</div>";
+    html += "<div class='kv-item'><span class='kv-label'>BSSID：</span>" + htmlEscape(profiles[i].bssid.length() == 0 ? "默认" : profiles[i].bssid) + "</div>";
     if (clampMode(profiles[i].mode) == MODE_BRIDGE) {
-      html += "<div class='kv'>上游WiFi：" + htmlEscape(profiles[i].upstreamSsid.length() > 0 ? profiles[i].upstreamSsid : "未配置") + "</div>";
-      html += "<div class='kv'>上游BSSID：" + htmlEscape(profiles[i].upstreamBssid.length() > 0 ? profiles[i].upstreamBssid : "自动") + "</div>";
+      html += "<div class='kv-item'><span class='kv-label'>上游 WiFi：</span>" + htmlEscape(profiles[i].upstreamSsid.length() > 0 ? profiles[i].upstreamSsid : "未配置") + "</div>";
+      html += "<div class='kv-item'><span class='kv-label'>上游 BSSID：</span>" + htmlEscape(profiles[i].upstreamBssid.length() > 0 ? profiles[i].upstreamBssid : "自动") + "</div>";
     }
+    html += "</div>";
     html += "<div class='actions'>";
     html += "<a class='btn btn-muted' href='/edit?idx=" + String(i) + "'>修改</a>";
 
@@ -116,30 +118,38 @@ void handleEdit() {
   String html = "<!DOCTYPE html><html lang='zh-CN'><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width,initial-scale=1.0'><title>编辑配置组</title>";
   html += baseStyles();
   html += "</head><body><div class='container'>";
-  html += "<h2>" + String(isEdit ? "修改配置组" : "新增配置组") + "</h2>";
+  html += "<h2 class='page-title'>" + String(isEdit ? "修改配置组" : "新增配置组") + "</h2>";
   html += "<form action='/profile/save' method='POST'>";
   html += "<input type='hidden' name='idx' value='" + String(isEdit ? idx : -1) + "'>";
 
+  html += "<div class='section'><h3 class='section-title'>基础信息</h3>";
   html += "<label>组名：</label><input type='text' name='name' value='" + htmlEscape(p.name) + "' required>";
   html += "<label>模式：</label><select id='mode' name='mode'>";
   html += "<option value='0'" + String(clampMode(p.mode) == MODE_AP ? " selected" : "") + ">AP 模式（仅热点）</option>";
   html += "<option value='1'" + String(clampMode(p.mode) == MODE_BRIDGE ? " selected" : "") + ">中继模式（连接上游WiFi并共享热点）</option>";
   html += "</select>";
+  html += "</div>";
+
+  html += "<div class='section'><h3 class='section-title'>热点参数</h3>";
   html += "<label>Wi-Fi 名称 (SSID)：</label><input type='text' name='ssid' value='" + htmlEscape(p.ssid) + "' required>";
   html += "<label>Wi-Fi 密码 (为空则不加密)：</label><input type='text' name='password' value='" + htmlEscape(p.password) + "'>";
   html += "<label>Wi-Fi 信道 (1-13)：</label><input type='number' name='channel' min='1' max='13' value='" + String(clampChannel(p.channel)) + "' required>";
   html += "<label>目标 BSSID (MAC地址, 例如 1A:2B:3C:4D:5E:6F)：</label><input type='text' name='bssid' value='" + htmlEscape(p.bssid) + "'>";
+  html += "</div>";
+
   html += "<div id='bridgeFields'>";
-  html += "<h3>上游 WiFi（中继模式）</h3>";
+  html += "<div class='section'><h3 class='section-title'>上游 WiFi（中继模式）</h3>";
   html += "<label>上游 WiFi 名称 (SSID)：</label><input id='upstreamSsid' type='text' name='upstream_ssid' value='" + htmlEscape(p.upstreamSsid) + "'>";
   html += "<label>上游 WiFi 密码：</label><input type='text' name='upstream_password' value='" + htmlEscape(p.upstreamPassword) + "'>";
   html += "<label>上游 BSSID (可选)：</label><input id='upstreamBssid' type='text' name='upstream_bssid' value='" + htmlEscape(p.upstreamBssid) + "'>";
   html += "<div class='toolbar'><a class='btn btn-secondary' href='#' onclick='scanNearbyWifi();return false;'>扫描附近 WiFi</a></div>";
   html += "<div id='scanResult' class='note'>点击扫描后可快速填充上游 WiFi。</div>";
-  html += "</div>";
-  html += "<button class='btn btn-success' type='submit' name='apply' value='0'>按组保存</button> ";
-  html += "<button class='btn btn-secondary' type='submit' name='apply' value='1'>保存并应用(重启)</button> ";
+  html += "</div></div>";
+  html += "<div class='actions'>";
+  html += "<button class='btn btn-primary' type='submit' name='apply' value='1'>保存并应用(重启)</button>";
+  html += "<button class='btn btn-success' type='submit' name='apply' value='0'>按组保存</button>";
   html += "<a class='btn btn-muted' href='/status'>返回查看页</a>";
+  html += "</div>";
   html += "<div class='note'>新增组也可直接“保存并应用”，会自动切换为该组并重启。</div>";
   html += "<script>";
   html += "const modeEl=document.getElementById('mode');";

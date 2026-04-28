@@ -57,31 +57,31 @@ void handleResources() {
   String html = "<!DOCTYPE html><html lang='zh-CN'><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width,initial-scale=1.0'><title>资源监控</title>";
   html += baseStyles();
   html += "</head><body><div class='container'>";
-  html += "<h2>当前资源使用情况</h2>";
+  html += "<h2 class='page-title'>资源监控</h2>";
   html += "<div class='toolbar'><a class='btn btn-muted' href='/status'>返回配置页</a><a class='btn btn-primary' href='/resources'>刷新</a><a class='btn btn-secondary' href='#' onclick='copyResourceSnapshot();return false;'>导出信息(JSON)</a></div>";
-  html += "<div class='row-card'><h3>运行信息</h3>";
-  html += "<div class='kv'>运行时长：" + formatUptime() + "</div>";
-  html += "<div class='kv'>SDK 版本：" + String(ESP.getSdkVersion()) + "</div>";
-  html += "<div class='kv'>芯片修订版本：" + String(ESP.getChipRevision()) + "</div>";
-  html += "<div class='kv'>当前连接设备数：" + String(stationCount) + "</div></div>";
+  html += "<div class='row-card'><h3 class='section-title'>运行信息</h3><div class='kv-grid'>";
+  html += "<div class='kv-item'><span class='kv-label'>运行时长：</span>" + formatUptime() + "</div>";
+  html += "<div class='kv-item'><span class='kv-label'>SDK 版本：</span>" + String(ESP.getSdkVersion()) + "</div>";
+  html += "<div class='kv-item'><span class='kv-label'>芯片修订版本：</span>" + String(ESP.getChipRevision()) + "</div>";
+  html += "<div class='kv-item'><span class='kv-label'>当前连接设备数：</span>" + String(stationCount) + "</div></div></div>";
 
-  html += "<div class='row-card'><h3>内存信息</h3>";
-  html += "<div class='kv'>可用 Heap：" + formatBytes(freeHeap) + "</div>";
-  html += "<div class='kv'>最小剩余 Heap：" + formatBytes(minFreeHeap) + "</div>";
-  html += "<div class='kv'>最大连续可分配 Heap：" + formatBytes(maxAllocHeap) + "</div>";
+  html += "<div class='row-card'><h3 class='section-title'>内存信息</h3><div class='kv-grid'>";
+  html += "<div class='kv-item'><span class='kv-label'>可用 Heap：</span>" + formatBytes(freeHeap) + "</div>";
+  html += "<div class='kv-item'><span class='kv-label'>最小剩余 Heap：</span>" + formatBytes(minFreeHeap) + "</div>";
+  html += "<div class='kv-item'><span class='kv-label'>最大连续可分配 Heap：</span>" + formatBytes(maxAllocHeap) + "</div>";
   if (psramSize > 0) {
-    html += "<div class='kv'>PSRAM 总量：" + formatBytes(psramSize) + "</div>";
-    html += "<div class='kv'>可用 PSRAM：" + formatBytes(freePsram) + "</div>";
+    html += "<div class='kv-item'><span class='kv-label'>PSRAM 总量：</span>" + formatBytes(psramSize) + "</div>";
+    html += "<div class='kv-item'><span class='kv-label'>可用 PSRAM：</span>" + formatBytes(freePsram) + "</div>";
   } else {
-    html += "<div class='kv'>PSRAM：未启用或硬件不支持</div>";
+    html += "<div class='kv-item'><span class='kv-label'>PSRAM：</span>未启用或硬件不支持</div>";
   }
-  html += "</div>";
+  html += "</div></div>";
 
-  html += "<div class='row-card'><h3>程序与 Flash</h3>";
-  html += "<div class='kv'>程序已占用：" + formatBytes(sketchSize) + "</div>";
-  html += "<div class='kv'>可用程序空间：" + formatBytes(freeSketch) + "</div>";
-  html += "<div class='kv'>Flash 总量：" + formatBytes(flashSize) + "</div>";
-  html += "<div class='kv'>Flash 频率：" + String(flashSpeed / 1000000UL) + " MHz</div></div>";
+  html += "<div class='row-card'><h3 class='section-title'>程序与 Flash</h3><div class='kv-grid'>";
+  html += "<div class='kv-item'><span class='kv-label'>程序已占用：</span>" + formatBytes(sketchSize) + "</div>";
+  html += "<div class='kv-item'><span class='kv-label'>可用程序空间：</span>" + formatBytes(freeSketch) + "</div>";
+  html += "<div class='kv-item'><span class='kv-label'>Flash 总量：</span>" + formatBytes(flashSize) + "</div>";
+  html += "<div class='kv-item'><span class='kv-label'>Flash 频率：</span>" + String(flashSpeed / 1000000UL) + " MHz</div></div></div>";
 
   html += "<div class='note'>提示：该页面为实时快照，点击刷新可查看最新资源状态。</div>";
   html += "<script>";
