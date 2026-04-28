@@ -12,7 +12,7 @@ String baseStyles() {
     "th,td{border:1px solid #ddd;padding:8px;font-size:14px;text-align:left;vertical-align:middle;}"
     "th{background:#f0f2f5;}"
     "label{display:block;margin:10px 0 5px;color:#666;font-size:14px;}"
-    "input[type='text'],input[type='password'],input[type='number']{width:100%;padding:10px;margin-bottom:10px;border:1px solid #ccc;border-radius:4px;box-sizing:border-box;}"
+    "input[type='text'],input[type='password'],input[type='number'],select{width:100%;padding:10px;margin-bottom:10px;border:1px solid #ccc;border-radius:4px;box-sizing:border-box;}"
     ".btn{display:inline-block;padding:10px 12px;border:none;border-radius:4px;cursor:pointer;color:#fff;text-decoration:none;font-size:14px;text-align:center;}"
     ".btn-primary{background:#007bff;}"
     ".btn-success{background:#28a745;}"

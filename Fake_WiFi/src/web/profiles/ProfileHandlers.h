@@ -6,3 +6,4 @@ void handleEdit();
 void handleProfileSave();
 void handleProfileDelete();
 void handleProfileSwitch();
+void handleWifiScan();

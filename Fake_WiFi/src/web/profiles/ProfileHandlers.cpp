@@ -1,9 +1,30 @@
 #include "ProfileHandlers.h"
 
+#include <WiFi.h>
+
 #include "../../common/AppState.h"
 #include "../../config/ProfileStore.h"
 #include "../auth/Auth.h"
 #include "../shared/WebUiUtils.h"
+
+static String modeLabel(int mode) {
+  return (clampMode(mode) == MODE_BRIDGE) ? "中继模式(AP+STA)" : "AP模式";
+}
+
+static String jsonEscape(const String& src) {
+  String out;
+  out.reserve(src.length() + 8);
+  for (size_t i = 0; i < src.length(); ++i) {
+    char c = src[i];
+    if (c == '\\') out += "\\\\";
+    else if (c == '"') out += "\\\"";
+    else if (c == '\n') out += "\\n";
+    else if (c == '\r') out += "\\r";
+    else if (c == '\t') out += "\\t";
+    else out += c;
+  }
+  return out;
+}
 
 void handleRoot() {
   if (!ensureAuth()) return;
@@ -38,9 +59,14 @@ void handleStatus() {
     html += "<div class='kv'>#" + String(j) + " 组名：" + htmlEscape(profiles[i].name);
     if (j == 0) html += "（当前）";
     html += "</div>";
+    html += "<div class='kv'>模式：" + modeLabel(profiles[i].mode) + "</div>";
     html += "<div class='kv'>SSID：" + htmlEscape(profiles[i].ssid) + "</div>";
     html += "<div class='kv'>信道：" + String(clampChannel(profiles[i].channel)) + "</div>";
     html += "<div class='kv'>BSSID：" + htmlEscape(profiles[i].bssid.length() == 0 ? "默认" : profiles[i].bssid) + "</div>";
+    if (clampMode(profiles[i].mode) == MODE_BRIDGE) {
+      html += "<div class='kv'>上游WiFi：" + htmlEscape(profiles[i].upstreamSsid.length() > 0 ? profiles[i].upstreamSsid : "未配置") + "</div>";
+      html += "<div class='kv'>上游BSSID：" + htmlEscape(profiles[i].upstreamBssid.length() > 0 ? profiles[i].upstreamBssid : "自动") + "</div>";
+    }
     html += "<div class='actions'>";
     html += "<a class='btn btn-muted' href='/edit?idx=" + String(i) + "'>修改</a>";
 
@@ -77,10 +103,14 @@ void handleEdit() {
     p = profiles[idx];
   } else {
     p.name = "配置组" + String(profileCount + 1);
+    p.mode = MODE_AP;
     p.ssid = ssid;
     p.password = password;
     p.channel = channel;
     p.bssid = bssid_str;
+    p.upstreamSsid = "";
+    p.upstreamPassword = "";
+    p.upstreamBssid = "";
   }
 
   String html = "<!DOCTYPE html><html lang='zh-CN'><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width,initial-scale=1.0'><title>编辑配置组</title>";
@@ -91,14 +121,62 @@ void handleEdit() {
   html += "<input type='hidden' name='idx' value='" + String(isEdit ? idx : -1) + "'>";
 
   html += "<label>组名：</label><input type='text' name='name' value='" + htmlEscape(p.name) + "' required>";
+  html += "<label>模式：</label><select id='mode' name='mode'>";
+  html += "<option value='0'" + String(clampMode(p.mode) == MODE_AP ? " selected" : "") + ">AP 模式（仅热点）</option>";
+  html += "<option value='1'" + String(clampMode(p.mode) == MODE_BRIDGE ? " selected" : "") + ">中继模式（连接上游WiFi并共享热点）</option>";
+  html += "</select>";
   html += "<label>Wi-Fi 名称 (SSID)：</label><input type='text' name='ssid' value='" + htmlEscape(p.ssid) + "' required>";
   html += "<label>Wi-Fi 密码 (为空则不加密)：</label><input type='text' name='password' value='" + htmlEscape(p.password) + "'>";
   html += "<label>Wi-Fi 信道 (1-13)：</label><input type='number' name='channel' min='1' max='13' value='" + String(clampChannel(p.channel)) + "' required>";
   html += "<label>目标 BSSID (MAC地址, 例如 1A:2B:3C:4D:5E:6F)：</label><input type='text' name='bssid' value='" + htmlEscape(p.bssid) + "'>";
+  html += "<div id='bridgeFields'>";
+  html += "<h3>上游 WiFi（中继模式）</h3>";
+  html += "<label>上游 WiFi 名称 (SSID)：</label><input id='upstreamSsid' type='text' name='upstream_ssid' value='" + htmlEscape(p.upstreamSsid) + "'>";
+  html += "<label>上游 WiFi 密码：</label><input type='text' name='upstream_password' value='" + htmlEscape(p.upstreamPassword) + "'>";
+  html += "<label>上游 BSSID (可选)：</label><input id='upstreamBssid' type='text' name='upstream_bssid' value='" + htmlEscape(p.upstreamBssid) + "'>";
+  html += "<div class='toolbar'><a class='btn btn-secondary' href='#' onclick='scanNearbyWifi();return false;'>扫描附近 WiFi</a></div>";
+  html += "<div id='scanResult' class='note'>点击扫描后可快速填充上游 WiFi。</div>";
+  html += "</div>";
   html += "<button class='btn btn-success' type='submit' name='apply' value='0'>按组保存</button> ";
   html += "<button class='btn btn-secondary' type='submit' name='apply' value='1'>保存并应用(重启)</button> ";
   html += "<a class='btn btn-muted' href='/status'>返回查看页</a>";
   html += "<div class='note'>新增组也可直接“保存并应用”，会自动切换为该组并重启。</div>";
+  html += "<script>";
+  html += "const modeEl=document.getElementById('mode');";
+  html += "const bridgeFields=document.getElementById('bridgeFields');";
+  html += "const scanResult=document.getElementById('scanResult');";
+  html += "function updateBridgeFields(){";
+  html += "const isBridge=modeEl&&modeEl.value==='1';";
+  html += "bridgeFields.style.display=isBridge?'block':'none';";
+  html += "}";
+  html += "modeEl.addEventListener('change',updateBridgeFields);";
+  html += "updateBridgeFields();";
+  html += "function applyNetwork(ssid,bssid){";
+  html += "document.getElementById('mode').value='1';";
+  html += "updateBridgeFields();";
+  html += "document.getElementById('upstreamSsid').value=ssid;";
+  html += "document.getElementById('upstreamBssid').value=bssid||'';";
+  html += "}";
+  html += "async function scanNearbyWifi(){";
+  html += "scanResult.innerHTML='扫描中...';";
+  html += "try{";
+  html += "const resp=await fetch('/wifi/scan');";
+  html += "if(!resp.ok){throw new Error('HTTP '+resp.status);}";
+  html += "const data=await resp.json();";
+  html += "if(!Array.isArray(data.networks)||data.networks.length===0){scanResult.innerHTML='未扫描到可用 WiFi';return;}";
+  html += "const rows=data.networks.map((n)=>{";
+  html += "const lock=n.open?'开放':'加密';";
+  html += "const bssid=n.bssid||'';";
+  html += "const safeSsid=(n.ssid||'').replace(/'/g,'&#39;');";
+  html += "const safeBssid=bssid.replace(/'/g,'&#39;');";
+  html += "return \"<div class='row-card'><div class='kv'>\"+safeSsid+\" | CH\"+n.channel+\" | RSSI \"+n.rssi+\" | \"+lock+\"</div><div class='actions'><a class='btn btn-primary' href='#' onclick=\\\"applyNetwork('\"+safeSsid+\"','\"+safeBssid+\"');return false;\\\">设为上游并填充</a></div></div>\";";
+  html += "});";
+  html += "scanResult.innerHTML=rows.join('');";
+  html += "}catch(e){";
+  html += "scanResult.innerHTML='扫描失败：'+e;";
+  html += "}";
+  html += "}";
+  html += "</script>";
   html += "</form></div></body></html>";
 
   server.send(200, "text/html; charset=UTF-8", html);
@@ -106,23 +184,31 @@ void handleEdit() {
 
 void handleProfileSave() {
   if (!ensureAuth()) return;
-  if (!server.hasArg("name") || !server.hasArg("ssid") || !server.hasArg("channel")) {
+  if (!server.hasArg("name") || !server.hasArg("ssid") || !server.hasArg("channel") || !server.hasArg("mode")) {
     server.send(400, "text/plain; charset=UTF-8", "参数不完整");
     return;
   }
 
   String nameArg = server.arg("name");
+  int modeArg = clampMode(server.arg("mode").toInt());
   String ssidArg = server.arg("ssid");
   String passArg = server.hasArg("password") ? server.arg("password") : "";
   int channelArg = clampChannel(server.arg("channel").toInt());
   String bssidArg = server.hasArg("bssid") ? server.arg("bssid") : "";
+  String upstreamSsidArg = server.hasArg("upstream_ssid") ? server.arg("upstream_ssid") : "";
+  String upstreamPassArg = server.hasArg("upstream_password") ? server.arg("upstream_password") : "";
+  String upstreamBssidArg = server.hasArg("upstream_bssid") ? server.arg("upstream_bssid") : "";
 
   if (nameArg.length() == 0 || ssidArg.length() == 0) {
     server.send(400, "text/plain; charset=UTF-8", "组名和SSID不能为空");
     return;
   }
-  if (!validBssid(bssidArg)) {
+  if (!validBssid(bssidArg) || !validBssid(upstreamBssidArg)) {
     server.send(400, "text/plain; charset=UTF-8", "BSSID 格式错误");
+    return;
+  }
+  if (modeArg == MODE_BRIDGE && upstreamSsidArg.length() == 0) {
+    server.send(400, "text/plain; charset=UTF-8", "中继模式必须填写上游WiFi SSID");
     return;
   }
 
@@ -130,10 +216,14 @@ void handleProfileSave() {
   int targetIdx = -1;
   if (idx >= 0 && idx < profileCount) {
     profiles[idx].name = nameArg;
+    profiles[idx].mode = modeArg;
     profiles[idx].ssid = ssidArg;
     profiles[idx].password = passArg;
     profiles[idx].channel = channelArg;
     profiles[idx].bssid = bssidArg;
+    profiles[idx].upstreamSsid = upstreamSsidArg;
+    profiles[idx].upstreamPassword = upstreamPassArg;
+    profiles[idx].upstreamBssid = upstreamBssidArg;
     targetIdx = idx;
   } else {
     if (profileCount >= MAX_PROFILES) {
@@ -141,10 +231,14 @@ void handleProfileSave() {
       return;
     }
     profiles[profileCount].name = nameArg;
+    profiles[profileCount].mode = modeArg;
     profiles[profileCount].ssid = ssidArg;
     profiles[profileCount].password = passArg;
     profiles[profileCount].channel = channelArg;
     profiles[profileCount].bssid = bssidArg;
+    profiles[profileCount].upstreamSsid = upstreamSsidArg;
+    profiles[profileCount].upstreamPassword = upstreamPassArg;
+    profiles[profileCount].upstreamBssid = upstreamBssidArg;
     targetIdx = profileCount;
     profileCount++;
   }
@@ -165,6 +259,36 @@ void handleProfileSave() {
 
   server.sendHeader("Location", "/status");
   server.send(302, "text/plain", "");
+}
+
+void handleWifiScan() {
+  if (!ensureAuth()) return;
+
+  int count = WiFi.scanNetworks(false, true);
+  if (count < 0) {
+    server.send(500, "application/json; charset=UTF-8", "{\"ok\":false,\"error\":\"scan_failed\"}");
+    return;
+  }
+
+  String json = "{\"ok\":true,\"networks\":[";
+  for (int i = 0; i < count; ++i) {
+    if (i > 0) json += ",";
+    String ssidScan = WiFi.SSID(i);
+    String bssidScan = WiFi.BSSIDstr(i);
+    int rssi = WiFi.RSSI(i);
+    int ch = WiFi.channel(i);
+    bool isOpen = (WiFi.encryptionType(i) == WIFI_AUTH_OPEN);
+    json += "{";
+    json += "\"ssid\":\"" + jsonEscape(ssidScan) + "\",";
+    json += "\"bssid\":\"" + jsonEscape(bssidScan) + "\",";
+    json += "\"rssi\":" + String(rssi) + ",";
+    json += "\"channel\":" + String(ch) + ",";
+    json += "\"open\":" + String(isOpen ? "true" : "false");
+    json += "}";
+  }
+  json += "]}";
+  WiFi.scanDelete();
+  server.send(200, "application/json; charset=UTF-8", json);
 }
 
 void handleProfileDelete() {
