@@ -134,7 +134,7 @@ void handleEdit() {
   html += "<label>Wi-Fi 名称 (SSID)：</label><input type='text' name='ssid' value='" + htmlEscape(p.ssid) + "' required>";
   html += "<label>Wi-Fi 密码 (为空则不加密)：</label><input type='text' name='password' value='" + htmlEscape(p.password) + "'>";
   html += "<label>Wi-Fi 信道 (1-13)：</label><input type='number' name='channel' min='1' max='13' value='" + String(clampChannel(p.channel)) + "' required>";
-  html += "<label>目标 BSSID (MAC地址, 例如 1A:2B:3C:4D:5E:6F)：</label><input type='text' name='bssid' value='" + htmlEscape(p.bssid) + "'>";
+  html += "<label>目标 BSSID (多MAC请用逗号分隔, 例如 1A:2B:3C:4D:5E:6F,1A:2B:3C:4D:5E:7F)：</label><input type='text' name='bssid' value='" + htmlEscape(p.bssid) + "'>";
   html += "</div>";
 
   html += "<div id='bridgeFields'>";
@@ -259,11 +259,21 @@ void handleProfileSave() {
   }
   saveProfilesToPreferences();
 
-  if (applyNow && targetIdx >= 0 && targetIdx < profileCount) {
+  if (applyNow) {
     applyProfileToRuntime();
     sendRestartPage("已应用配置组：" + htmlEscape(profiles[activeProfile].name));
     delay(1000);
     ESP.restart();
+    return;
+  }
+
+  // 区分是否修改了当前激活的组
+  if (targetIdx == activeProfile) {
+    // 使用 JS 弹窗提示，然后返回状态页
+    String html = "<!DOCTYPE html><html><head><meta charset='UTF-8'></head><body>";
+    html += "<script>alert('当前生效组的配置已修改，将在下次设备重启后生效。');window.location.href='/status';</script>";
+    html += "</body></html>";
+    server.send(200, "text/html; charset=UTF-8", html);
     return;
   }
 

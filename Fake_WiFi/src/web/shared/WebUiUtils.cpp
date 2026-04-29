@@ -82,7 +82,20 @@ String htmlEscape(const String& src) {
 void sendRestartPage(const String& msg) {
   String html = "<!DOCTYPE html><html lang='zh-CN'><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width,initial-scale=1.0'><title>重启中</title>";
   html += baseStyles();
-  html += "</head><body><div class='container'><h2>配置已保存</h2><p>" + msg + "</p><p>设备正在重启，请稍后重新连接热点并打开管理页面。</p></div></body></html>";
+  html += "<script>";
+  html += "let countdown = 10;";
+  html += "setInterval(() => {";
+  html += "  countdown--;";
+  html += "  const btn = document.getElementById('backBtn');";
+  html += "  if(btn && countdown > 0) btn.innerText = '返回配置页 (' + countdown + 's)';";
+  html += "  if(countdown <= 0) window.location.href = '/status';";
+  html += "}, 1000);";
+  html += "</script>";
+  html += "</head><body><div class='container'><h2>配置已保存</h2><p>" + msg + "</p>";
+  html += "<p>设备正在重启，请稍后重新连接热点并打开管理页面。</p>";
+  html += "<div class='actions' style='margin-top: 20px;'>";
+  html += "<a id='backBtn' class='btn btn-primary' href='/status'>返回配置页 (10s)</a>";
+  html += "</div></div></body></html>";
   server.send(200, "text/html; charset=UTF-8", html);
 }
 

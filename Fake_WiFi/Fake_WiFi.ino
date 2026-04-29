@@ -2,6 +2,8 @@
 #include <WebServer.h>
 #include <Preferences.h>
 #include <esp_wifi.h>
+#include "soc/soc.h"           // 引入 BOD 控制需要的头文件
+#include "soc/rtc_cntl_reg.h"  // 引入 BOD 控制需要的头文件
 #if defined(__has_include)
 #if __has_include("lwip/lwip_napt.h")
 #include "lwip/lwip_napt.h"
@@ -68,14 +70,43 @@ static bool parseMacText(const String& macText, uint8_t mac[6]) {
 }
 
 static void applyApMacIfNeeded() {
-  if (bssid_str.length() != 17) return;
+  if (bssid_str.length() == 0) return;
+
+  // 将逗号分隔的 BSSID 字符串解析为数组
+  int macCount = 0;
+  String macs[10]; // 最多支持10个MAC地址轮换
+  int startIdx = 0;
+  while (startIdx < bssid_str.length() && macCount < 10) {
+    int commaIdx = bssid_str.indexOf(',', startIdx);
+    if (commaIdx == -1) commaIdx = bssid_str.length();
+    
+    String mac = bssid_str.substring(startIdx, commaIdx);
+    mac.trim();
+    if (mac.length() == 17) {
+      macs[macCount++] = mac;
+    }
+    startIdx = commaIdx + 1;
+  }
+
+  if (macCount == 0) return;
+
+  // 读取上次使用的索引，并计算本次应该使用的索引
+  int lastBssidIdx = preferences.getInt("last_bssid_idx", -1);
+  int currentBssidIdx = (lastBssidIdx + 1) % macCount;
+  
+  // 更新并保存当前索引供下次使用
+  preferences.putInt("last_bssid_idx", currentBssidIdx);
+
   uint8_t mac[6];
-  if (!parseMacText(bssid_str, mac)) return;
+  if (!parseMacText(macs[currentBssidIdx], mac)) return;
+  
   esp_err_t err = esp_wifi_set_mac(WIFI_IF_AP, mac);
   if (err == ESP_OK) {
-    Serial.println("自定义 BSSID 设置成功。");
+    Serial.print("自定义 BSSID 设置成功。当前轮换到: ");
+    Serial.println(macs[currentBssidIdx]);
   } else {
-    Serial.println("自定义 BSSID 设置失败！");
+    Serial.print("自定义 BSSID 设置失败！目标: ");
+    Serial.println(macs[currentBssidIdx]);
   }
 }
 
@@ -131,6 +162,8 @@ static void enableNatIfPossible() {
 }
 
 void setup() {
+  WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0); // 关闭欠压检测 (Brownout detector)，防止因瞬间电流过大导致重启
+
   Serial.begin(115200);
   delay(1000);
   
@@ -145,6 +178,10 @@ void setup() {
     Serial.println("正在启动 AP 模式(启用 STA 接口以支持扫描)...");
     WiFi.mode(WIFI_AP_STA);
   }
+
+  // 降低 Wi-Fi 发射功率以减小峰值电流 (默认约为 19.5dBm 或 20dBm，这里降低到 8.5dBm 左右)
+  // 如果发现信号太弱，可以改成 WIFI_POWER_11dBm, WIFI_POWER_15dBm 等
+  WiFi.setTxPower(WIFI_POWER_8_5dBm);
 
   applyApMacIfNeeded();
 

@@ -15,10 +15,26 @@ int clampMode(int mode) {
 
 bool validBssid(const String& macText) {
   if (macText.length() == 0) return true;
-  if (macText.length() != 17) return false;
-  int values[6];
-  return (6 == sscanf(macText.c_str(), "%x:%x:%x:%x:%x:%x",
-                      &values[0], &values[1], &values[2], &values[3], &values[4], &values[5]));
+  // 允许使用逗号分隔的多个 MAC 地址
+  int startIdx = 0;
+  while (startIdx < macText.length()) {
+    int commaIdx = macText.indexOf(',', startIdx);
+    if (commaIdx == -1) commaIdx = macText.length();
+    
+    String mac = macText.substring(startIdx, commaIdx);
+    mac.trim();
+    
+    if (mac.length() > 0) {
+      if (mac.length() != 17) return false;
+      int values[6];
+      if (6 != sscanf(mac.c_str(), "%x:%x:%x:%x:%x:%x",
+                      &values[0], &values[1], &values[2], &values[3], &values[4], &values[5])) {
+        return false;
+      }
+    }
+    startIdx = commaIdx + 1;
+  }
+  return true;
 }
 
 static String keyFor(int index, const char* suffix) {
